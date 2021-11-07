@@ -3,7 +3,6 @@ package parser
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -18,89 +17,125 @@ var (
 
 // ZapTextParser parses zap text format log line data.
 type ZapTextParser struct {
-	err    error
-	Ts     time.Time
-	level  zapcore.Level
-	Caller string
-	Msg    string
-	Data   []logKV
-}
-
-// logKV key value for log extra items.
-type logKV struct {
-	Key   string
-	Value string
+	line []byte
+	cur  int
 }
 
 // ParseLine do the parsing procedure.
-func (p *ZapTextParser) ParseLine(line []byte) {
-	p.Data = nil
+func (p *ZapTextParser) ParseLine(line []byte) Entry {
+	entry := Entry{}
+	p.line = line
+	p.cur = 0
 
-	var buffer []byte
-
-	var cur int
-
-	buffer, cur = p.readNextBlock(line, cur)
-
-	if cur != -1 {
-		p.Ts, p.err = time.Parse("2006/01/02 15:04:05.000 -07:00", string(buffer))
-	} else {
-		p.err = ErrInvalidLogFormat
-
-		return
+	entry.TS, entry.Err = p.parseTimeStamp()
+	if entry.Err != nil {
+		return entry
 	}
 
-	buffer, cur = p.readNextBlock(line, cur)
-	if cur != -1 {
+	entry.Level, entry.Err = p.parseLogLevel()
+	if entry.Err != nil {
+		return entry
+	}
+
+	entry.Caller, entry.Err = p.parseCaller()
+	if entry.Err != nil {
+		return entry
+	}
+
+	entry.Msg, entry.Err = p.parseMsg()
+	if entry.Err != nil {
+		return entry
+	}
+
+	entry.Data = p.parseData()
+
+	return entry
+}
+
+func (p *ZapTextParser) parseTimeStamp() (time.Time, error) {
+	var buffer []byte
+	buffer, p.cur = p.readNextBlock(p.line, p.cur)
+
+	if p.cur != -1 {
+		return time.Parse("2006/01/02 15:04:05.000 -07:00", string(buffer))
+	} else {
+		return time.Time{}, ErrInvalidLogFormat
+	}
+}
+
+func (p *ZapTextParser) parseLogLevel() (zapcore.Level, error) {
+	var buffer []byte
+	buffer, p.cur = p.readNextBlock(p.line, p.cur)
+	if p.cur != -1 {
 		switch string(buffer) {
 		case "DEBUG":
-			p.level = zap.DebugLevel
+			return zap.DebugLevel, nil
 		case "INFO":
-			p.level = zap.InfoLevel
+			return zap.InfoLevel, nil
 		case "WARN":
-			p.level = zap.WarnLevel
+			return zap.WarnLevel, nil
 		case "ERROR":
-			p.level = zap.ErrorLevel
+			return zap.ErrorLevel, nil
 		default:
-			p.err = ErrInvalidLogLevel
+			return 0, ErrInvalidLogLevel
 		}
 	}
+	return 0, ErrInvalidLogLevel
+}
 
-	buffer, cur = p.readNextBlock(line, cur)
-	if cur != -1 {
-		p.Caller = string(buffer)
+func (p *ZapTextParser) parseCaller() (string, error) {
+	var buffer []byte
+	buffer, p.cur = p.readNextBlock(p.line, p.cur)
+	if p.cur != -1 {
+		return string(buffer), nil
 	}
+	return "", ErrInvalidLogFormat
+}
 
-	buffer, cur = p.readNextBlock(line, cur)
-	if cur != -1 {
-		p.Msg = string(buffer)
+func (p *ZapTextParser) parseMsg() (string, error) {
+	var buffer []byte
+	buffer, p.cur = p.readNextBlock(p.line, p.cur)
+	if p.cur != -1 {
+		if len(buffer) > 0 && buffer[0] == '"' && buffer[len(buffer)-1] == '"' {
+			return string(buffer[1 : len(buffer)-1]), nil
+		} else {
+			return string(buffer), nil
+		}
 	}
+	return "", ErrInvalidLogFormat
+}
 
-	for cur != -1 {
-		buffer, cur = p.readNextBlock(line, cur)
-		if cur != -1 {
+func (p *ZapTextParser) parseData() []LogKV {
+	var buffer []byte
+	var result []LogKV
+
+	for p.cur != -1 {
+		buffer, p.cur = p.readNextBlock(p.line, p.cur)
+		if p.cur != -1 {
 			sep := bytes.IndexByte(buffer, '=')
 			if sep == -1 {
-				p.Data = append(p.Data, logKV{
+				result = append(result, LogKV{
 					Key:   "",
 					Value: string(buffer),
 				})
 			} else {
-				p.Data = append(p.Data, logKV{
+				result = append(result, LogKV{
 					Key:   string(buffer[:sep]),
 					Value: string(buffer[sep+1:]),
 				})
 			}
 		}
 	}
+	return result
 }
 
 func (p *ZapTextParser) Err() error {
-	return p.err
+	return nil
 }
 
 func (p *ZapTextParser) String() string {
-	return fmt.Sprintf("%v %v %v %v", p.Ts, p.level, p.Caller, p.Msg)
+	//	return fmt.Sprintf("%v %v %v %v", p.Ts, p.level, p.Caller, p.Msg)
+	return ""
 }
 
 func (p *ZapTextParser) readNextBlock(line []byte, idx int) ([]byte, int) {
