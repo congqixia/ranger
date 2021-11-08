@@ -3,6 +3,7 @@ package parser
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -119,8 +120,12 @@ func (p *ZapTextParser) parseData() []LogKV {
 					Value: string(buffer),
 				})
 			} else {
+				key := string(buffer[:sep])
+				if strings.HasPrefix(key, `"`) && strings.HasSuffix(key, `"`) {
+					key = key[1 : len(key)-1]
+				}
 				result = append(result, LogKV{
-					Key:   string(buffer[:sep]),
+					Key:   key,
 					Value: string(buffer[sep+1:]),
 				})
 			}
