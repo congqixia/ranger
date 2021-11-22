@@ -2,6 +2,7 @@ package processors
 
 import "github.com/congqixia/milvus-log-parser/parser"
 
+// Filter defines utility filters entries
 type Filter interface {
 	FiltersEntry(parser.Entry) bool
 }

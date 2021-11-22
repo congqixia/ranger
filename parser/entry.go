@@ -15,6 +15,8 @@ type Entry struct {
 	Caller string
 	Msg    string
 	Data   []LogKV
+
+	Processed bool // flag about this entry is processed by some processor
 }
 
 // LogKV key value for log extra items.

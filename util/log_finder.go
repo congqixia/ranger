@@ -12,6 +12,7 @@ const (
 	Auto FindLogMode = iota
 	Standalone
 	Distributed
+	Flat
 )
 
 // FindLogs returns milvus log file path under provided root path.
@@ -44,11 +45,14 @@ func FindLogs(path string, mode FindLogMode) []string {
 		case strings.Contains(path, "/indexcoord/"):
 			fallthrough
 		case strings.Contains(path, "/indexnode/"):
-			if strings.HasSuffix(path, ".gz") {
+			if strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".tmp") {
 				return nil
 			}
 			paths = append(paths, path)
 		default:
+			if mode == Flat && strings.HasSuffix(path, ".log") {
+				paths = append(paths, path)
+			}
 		}
 
 		return nil

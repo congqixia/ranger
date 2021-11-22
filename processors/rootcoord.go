@@ -25,7 +25,7 @@ type CollectionLifeTime struct {
 }
 
 // ProcessEntry implements Processor.
-func (p *CollectionLifeCircleProcessor) ProcessEntry(entry parser.Entry) {
+func (p *CollectionLifeCircleProcessor) ProcessEntry(entry *parser.Entry) {
 	if entry.Err != nil {
 		return
 	}
@@ -71,10 +71,13 @@ func (p *CollectionLifeCircleProcessor) ProcessEntry(entry parser.Entry) {
 		}
 	case collectionIDName:
 		p.parseCollIDName(entry)
+	default:
+		return
 	}
+	entry.Processed = true
 }
 
-func (p *CollectionLifeCircleProcessor) parseCollIDName(entry parser.Entry) {
+func (p *CollectionLifeCircleProcessor) parseCollIDName(entry *parser.Entry) {
 	name, has := entry.SearchData("collection name")
 	if !has {
 		return
