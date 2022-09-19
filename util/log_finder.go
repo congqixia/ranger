@@ -29,6 +29,10 @@ func FindLogs(path string, mode FindLogMode) []string {
 		if info.IsDir() {
 			return nil
 		}
+		if strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".tmp") {
+			return nil
+		}
+
 		switch {
 		case strings.Contains(path, "/datacoord/"):
 			fallthrough
@@ -50,7 +54,7 @@ func FindLogs(path string, mode FindLogMode) []string {
 			}
 			paths = append(paths, path)
 		default:
-			if mode == Flat && strings.HasSuffix(path, ".log") {
+			if mode == Flat && strings.Contains(path, ".log") {
 				paths = append(paths, path)
 			}
 		}

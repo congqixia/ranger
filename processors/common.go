@@ -1,6 +1,10 @@
 package processors
 
-import "github.com/congqixia/milvus-log-parser/parser"
+import "github.com/congqixia/ranger/parser"
+
+var (
+	TimeFormat = `2006-01-02 15:04:05.000 -0700`
+)
 
 // Filter defines utility filters entries
 type Filter interface {

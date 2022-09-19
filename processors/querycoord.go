@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/congqixia/milvus-log-parser/parser"
+	"github.com/congqixia/ranger/parser"
 )
 
 const (
@@ -67,8 +67,8 @@ func (p *LoadCollectionProcessor) ProcessEntry(entry *parser.Entry) {
 type LoadSegmentsRequest struct {
 	DstNodeID    int64              `json:"dst_nodeID,omitempty"`
 	Infos        []*SegmentLoadInfo `protobuf:"bytes,3,rep,name=infos,proto3" json:"infos,omitempty"`
-	SourceNodeID int64              `"json:"source_nodeID,omitempty"`
-	CollectionID int64              `"json:"collectionID,omitempty"`
+	SourceNodeID int64              `json:"source_nodeID,omitempty"`
+	CollectionID int64              `json:"collectionID,omitempty"`
 }
 
 //used for handoff task

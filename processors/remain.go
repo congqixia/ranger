@@ -1,6 +1,6 @@
 package processors
 
-import "github.com/congqixia/milvus-log-parser/parser"
+import "github.com/congqixia/ranger/parser"
 
 type RemainCounter struct {
 	Counter map[string]int64

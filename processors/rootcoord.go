@@ -3,14 +3,14 @@ package processors
 import (
 	"time"
 
-	"github.com/congqixia/milvus-log-parser/parser"
+	"github.com/congqixia/ranger/parser"
 )
 
 // rootcoord msg consts.
 const (
-	createCollectionEnqueue = "CreateCollection enqueue"
-	dropCollectionEnqueue   = "DropCollection enqueue"
-	collectionIDName        = "collection name -> id"
+	createCollectionEnqueue = "received request to create collection" //"CreateCollection enqueue"
+	dropCollectionEnqueue   = "received request to drop collection"   //"DropCollection enqueue"
+	collectionIDName        = "add collection to meta table"          //"collection name -> id"
 )
 
 // CollectionLifeCircleProcessor extracts collection create / drop events in rootcoord.
@@ -43,7 +43,7 @@ func (p *CollectionLifeCircleProcessor) ProcessEntry(entry *parser.Entry) {
 	switch entry.Msg {
 	case createCollectionEnqueue:
 		for _, kv := range entry.Data {
-			if kv.Key == "collection" {
+			if kv.Key == "name" {
 				lifetime := p.Info[kv.Value]
 				if lifetime == nil {
 					lifetime = &CollectionLifeTime{}
@@ -57,7 +57,7 @@ func (p *CollectionLifeCircleProcessor) ProcessEntry(entry *parser.Entry) {
 		}
 	case dropCollectionEnqueue:
 		for _, kv := range entry.Data {
-			if kv.Key == "collection" {
+			if kv.Key == "name" {
 				lifetime := p.Info[kv.Value]
 				if lifetime == nil {
 					lifetime = &CollectionLifeTime{}
@@ -78,12 +78,12 @@ func (p *CollectionLifeCircleProcessor) ProcessEntry(entry *parser.Entry) {
 }
 
 func (p *CollectionLifeCircleProcessor) parseCollIDName(entry *parser.Entry) {
-	name, has := entry.SearchData("collection name")
+	name, has := entry.SearchData("collection")
 	if !has {
 		return
 	}
 
-	id, has := entry.SearchDataInt64("collection_id")
+	id, has := entry.SearchDataInt64("id")
 	if !has {
 		return
 	}

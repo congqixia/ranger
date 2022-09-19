@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/congqixia/milvus-log-parser/parser"
-	"github.com/congqixia/milvus-log-parser/processors"
-	"github.com/congqixia/milvus-log-parser/util"
+	"github.com/congqixia/ranger/parser"
+	"github.com/congqixia/ranger/processors"
+	"github.com/congqixia/ranger/util"
 )
 
 var (
@@ -21,6 +21,7 @@ var (
 	collName         = flag.String("collname", "", "Collection name to inspect")
 	printRemain      = flag.Bool("remain", false, "Print log not processed")
 	printRemainLimit = flag.Int64("remain-limit", 10, "Print log not processed minimal occurs times")
+	printSkip        = flag.Bool("print-skip", false, "Print collection being skipped")
 )
 
 func main() {
@@ -37,6 +38,7 @@ func main() {
 	default:
 	}
 	filePaths := util.FindLogs(*logRoot, mode)
+	fmt.Println("filePath:", filePaths)
 
 	flushProcessor := &processors.FlushProcessor{}
 	getRecoveryInfoProessor := &processors.GetRecoveryInfoProcessor{}
@@ -71,12 +73,13 @@ func main() {
 	}
 
 	zeroCount := 0
-	for _, ele := range collProcessor.Info {
+	fmt.Printf("collection info has %d entries\n", len(collProcessor.ID2Name))
+	for collection, ele := range collProcessor.Info {
 		if ele.CreatedAt.IsZero() || ele.DropedAt.IsZero() {
 			zeroCount++
 			continue
 		}
-		//fmt.Printf("collection %s start - end: %v-%v duration: %v\n", collection, ele.CreatedAt, ele.DropedAt, ele.DropedAt.Sub(ele.CreatedAt))
+		fmt.Printf("collection %s start - end: %v-%v duration: %v\n", collection, ele.CreatedAt, ele.DropedAt, ele.DropedAt.Sub(ele.CreatedAt))
 	}
 	fmt.Println("zero count:", zeroCount)
 
@@ -95,17 +98,20 @@ func main() {
 	}
 	fmt.Println("filtering with targets:", targets)
 
+	fmt.Println()
+	fmt.Println("=======================Segment Flush Information=============================")
 	for coll, info := range flushProcessor.Info {
 		found := false
 		for _, target := range targets {
 			if target == coll {
-				fmt.Println("found in flush")
 				found = true
 				break
 			}
 		}
 		if !found && len(targets) > 0 {
-			fmt.Println(coll, "skipped")
+			if *printSkip {
+				fmt.Println(coll, "skipped")
+			}
 			continue
 		}
 		sort.Slice(info.Events, func(i, j int) bool {
@@ -133,18 +139,34 @@ func main() {
 			continue
 		}
 
-		fmt.Printf("[%v]%s: %v\n", record.Ts, record.RecordType, record.CollectionID)
+		fmt.Printf("[%v]%s: CollectionID:%v\n", record.Ts, record.RecordType, record.CollectionID)
 	}
 	sort.Slice(loadCollectionProcessor.Records, func(i, j int) bool {
 		return loadCollectionProcessor.Records[i].Ts.Before(loadCollectionProcessor.Records[j].Ts)
 	})
 
 	for _, record := range loadCollectionProcessor.Records {
-		fmt.Printf("[%v]%s: %v, detail: %v\n", record.Ts, record.RecordType, record.CollectionID, record.Extra)
+		found := false
+		for _, target := range targets {
+			if target == record.CollectionID {
+				found = true
+				break
+			}
+		}
+		if !found && len(targets) > 0 {
+			continue
+		}
+		fmt.Printf("[%v]%s: CollectionID:%v, detail: %v\n", record.Ts, record.RecordType, record.CollectionID, record.Extra)
+	}
+	if len(compactionProcessor.Plans) > 0 {
+		fmt.Println()
+		fmt.Println("=======================Compaction Information=============================")
 	}
 
 	for _, plan := range compactionProcessor.Plans {
-		fmt.Printf("[%v]Plan: %d(Channel:%s), compact segments:%v\n", plan.StartTime, plan.PlanID, plan.Channel, plan.SegmentIDs)
+		result := compactionProcessor.PlanIDEntry[plan.PlanID]
+		fmt.Printf("[%v]Plan: %d(Channel:%s), compact segments:%v, result segment: %d Success: %v End: %v \n", plan.StartTime, plan.PlanID, plan.Channel, plan.SegmentIDs,
+			result.SegmentID, result.Success, result.EndTime)
 	}
 
 	if *printRemain {

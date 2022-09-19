@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/congqixia/milvus-log-parser/parser"
+	"github.com/congqixia/ranger/parser"
 )
 
 const (
@@ -114,7 +114,7 @@ func (fe FlushEvent) EvtType() EventType {
 }
 
 func (fe FlushEvent) Display() string {
-	return fmt.Sprintf("%d ts: %v", fe.EventType, fe.TS)
+	return fmt.Sprintf("[%s] ts: %v", "Flush Request", fe.TS.Format(TimeFormat))
 }
 
 type FlushWithSegment struct {
@@ -124,7 +124,7 @@ type FlushWithSegment struct {
 }
 
 func (e FlushWithSegment) Display() string {
-	return fmt.Sprintf("%d ts: %v, segments: %v", e.EventType, e.TS, e.Segments)
+	return fmt.Sprintf("[%s] ts: %v, segments: %v", "Flush Seg IDs", e.TS.Format(TimeFormat), e.Segments)
 }
 
 type SaveBinlogPaths struct {
@@ -132,13 +132,14 @@ type SaveBinlogPaths struct {
 
 	Segment   int64
 	IsFlush   bool
+	IsDrop    bool
 	NumOfRows int64
 }
 
 // Display prints info about SaveBinlogPaths
 func (e SaveBinlogPaths) Display() string {
-	return fmt.Sprintf("%d ts: %v segment: %d, flushed:%v, num rows: %d",
-		e.EventType, e.TS, e.Segment, e.IsFlush, e.NumOfRows)
+	return fmt.Sprintf("[%s]ts: %v segment: %d, flushed:%v, dropped:%v, num rows: %d",
+		"SaveBinlogs", e.TS.Format(TimeFormat), e.Segment, e.IsFlush, e.IsDrop, e.NumOfRows)
 }
 
 type Checkpoint struct {
@@ -194,6 +195,7 @@ func (p *FlushProcessor) ProcessEntry(entry *parser.Entry) {
 
 		segmentID, _ := entry.SearchDataInt64("segmentID")
 		flushed, _ := entry.SearchDataBool("isFlush")
+		dropped, _ := entry.SearchDataBool("isDropped")
 
 		cpStr, has := entry.SearchData("checkpoints")
 		if has && len(cpStr) > 2 {
@@ -222,6 +224,7 @@ func (p *FlushProcessor) ProcessEntry(entry *parser.Entry) {
 
 			Segment:   segmentID,
 			IsFlush:   flushed,
+			IsDrop:    dropped,
 			NumOfRows: numOfRows,
 		})
 	default:

@@ -5,16 +5,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/congqixia/milvus-log-parser/parser"
+	"github.com/congqixia/ranger/parser"
 	"github.com/golang/protobuf/proto"
 )
 
 const (
-	execMergePlan = `exec merge compaction plan`
+	execMergePlan          = `exec merge compaction plan`
+	completeSegmentRequest = `receive complete compaction request`
+	successCompletePlan    = `success to complete compaction`
 )
 
 type CompactionProcessor struct {
-	Plans []CompactionPlanRecord
+	Plans       []CompactionPlanRecord
+	PlanIDEntry map[int64]CompactionPlanResult
 }
 
 type CompactionPlanRecord struct {
@@ -24,7 +27,16 @@ type CompactionPlanRecord struct {
 	SegmentIDs []int64
 }
 
+type CompactionPlanResult struct {
+	SegmentID int64
+	EndTime   time.Time
+	Success   bool
+}
+
 func (p *CompactionProcessor) ProcessEntry(entry *parser.Entry) {
+	if p.PlanIDEntry == nil {
+		p.PlanIDEntry = make(map[int64]CompactionPlanResult)
+	}
 	switch entry.Msg {
 	case execMergePlan:
 		planRaw, has := entry.SearchData("plan")
@@ -50,6 +62,29 @@ func (p *CompactionProcessor) ProcessEntry(entry *parser.Entry) {
 				SegmentIDs: segmentIDs,
 			})
 		}
+	case completeSegmentRequest:
+		planID, has := entry.SearchDataInt64("planID")
+		if !has {
+			break
+		}
+		segmentID, has := entry.SearchDataInt64("segmentID")
+		if !has {
+			break
+		}
+		result := p.PlanIDEntry[planID]
+		result.SegmentID = segmentID
+		p.PlanIDEntry[planID] = result
+
+	case successCompletePlan:
+		planID, has := entry.SearchDataInt64("planID")
+		if !has {
+			break
+		}
+		result := p.PlanIDEntry[planID]
+		result.EndTime = entry.TS
+		result.Success = true
+		p.PlanIDEntry[planID] = result
+
 	default:
 		return
 	}
